@@ -1,0 +1,1 @@
+export { RulesPage } from "./RulesPage";

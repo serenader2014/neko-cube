@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "4001"],
+      "port": 4001
+    },
+    {
+      "name": "api-local",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": ["-lc", "npm run dev:local"],
+      "port": 36124
+    },
+    {
+      "name": "web-local",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": ["-lc", "npm run dev:web:local"],
+      "port": 4000
+    }
+  ]
+}
