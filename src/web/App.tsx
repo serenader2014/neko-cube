@@ -14,7 +14,9 @@ const DeviceProfilesPage = lazy(() => import("./pages/DeviceProfilesPage").then(
 const RuntimePage = lazy(() => import("./pages/runtime/RuntimePage").then(({ RuntimePage }) => ({ default: RuntimePage })));
 const RuntimeOverviewPage = lazy(() => import("./pages/runtime/RuntimePage").then(({ RuntimeOverviewPage }) => ({ default: RuntimeOverviewPage })));
 const RuntimeProxiesPage = lazy(() => import("./pages/runtime/RuntimePage").then(({ RuntimeProxiesPage }) => ({ default: RuntimeProxiesPage })));
-const RuntimeConnectionsPage = lazy(() => import("./pages/runtime/RuntimePage").then(({ RuntimeConnectionsPage }) => ({ default: RuntimeConnectionsPage })));
+export const loadRuntimeConnectionsPage = () =>
+  import("./pages/runtime/RuntimeConnectionsPage").then(({ RuntimeConnectionsPage }) => ({ default: RuntimeConnectionsPage }));
+const RuntimeConnectionsPage = lazy(loadRuntimeConnectionsPage);
 const RuntimeLogsPage = lazy(() => import("./pages/runtime/RuntimeLogsPage").then(({ RuntimeLogsPage }) => ({ default: RuntimeLogsPage })));
 const AnalyticsPage = lazy(() => import("./pages/analytics/AnalyticsPage").then(({ AnalyticsPage }) => ({ default: AnalyticsPage })));
 const AnalyticsOverviewPage = lazy(() => import("./pages/analytics/AnalyticsOverviewPage").then(({ AnalyticsOverviewPage }) => ({ default: AnalyticsOverviewPage })));
