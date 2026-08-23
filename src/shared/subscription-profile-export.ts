@@ -407,10 +407,17 @@ function buildProfileContent(client: ProfileClient, profile: PreparedProfile): s
       ...comments,
       ...joinSections([
         ["general", ["server_check_url = http://cp.cloudflare.com/generate_204"]],
-        ["server_local", profile.proxyLines],
+        ["dns", []],
         ["policy", profile.groupLines],
+        ["server_remote", []],
         ["filter_remote", profile.remoteRules],
+        ["rewrite_remote", []],
+        ["server_local", profile.proxyLines],
         ["filter_local", profile.localRules],
+        ["rewrite_local", []],
+        ["task_local", []],
+        ["http_backend", []],
+        ["mitm", []],
       ]),
     ].join("\n")}\n`;
   }

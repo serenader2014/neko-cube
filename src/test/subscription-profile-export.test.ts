@@ -69,20 +69,27 @@ describe("exportClientProfileDocument", () => {
   it("builds a complete Quantumult X profile with remote filters", () => {
     const result = exportClientProfileDocument(config, "quantumult-x");
 
+    expect(result.content).toContain("[dns]");
     expect(result.content).toContain("[server_local]");
     expect(result.content).toContain("shadowsocks=192.0.2.1:443");
     expect(result.content).toContain("[policy]");
+    expect(result.content).toContain("[server_remote]");
     expect(result.content).toContain("static = Proxy Policy, Hong Kong · 01, direct");
     expect(result.content).toContain("static = FINAL, Proxy Policy, direct");
     expect(result.content).not.toContain("static = Proxy, Hong Kong · 01");
     expect(result.content).toContain("host-suffix,proxy.example,Proxy Policy");
     expect(result.content).toContain("url-latency-benchmark = AUTO, Hong Kong · 01, check-interval=300");
     expect(result.content).toContain("[filter_remote]");
+    expect(result.content).toContain("[rewrite_remote]");
     expect(result.content).toContain(
       "https://rules.example.com/apple.list, tag=Apple, force-policy=FINAL, enabled=true",
     );
     expect(result.content).toContain("host-suffix,example.com,AUTO");
     expect(result.content).toContain("final,FINAL");
+    expect(result.content).toContain("[rewrite_local]");
+    expect(result.content).toContain("[task_local]");
+    expect(result.content).toContain("[http_backend]");
+    expect(result.content).toContain("[mitm]");
   });
 
   it("builds a complete Loon profile with its Remote Rule section", () => {
