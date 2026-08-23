@@ -2,14 +2,22 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
-import { fetch as undiciFetch, ProxyAgent } from "undici";
 import { compileClashConfig } from "../../shared/compile.js";
 import { exportSubscriptionDocument, type SubscriptionDocument } from "../../shared/subscription-export.js";
 import { exportClientProfileDocument } from "../../shared/subscription-profile-export.js";
-import type { SubscriptionClientId, SubscriptionKind } from "../../shared/subscription-clients.js";
+import {
+  buildSubscriptionRuleSetPath,
+  type SubscriptionClientId,
+  type SubscriptionKind,
+  type SubscriptionRuleClientId,
+} from "../../shared/subscription-clients.js";
+import {
+  exportRuleSetDocument,
+  readRuleProviderSource,
+  type RuleSetDocument,
+} from "../../shared/subscription-rule-export.js";
 import { parseClashSubscription } from "../../shared/subscription.js";
 import type { DeviceProfile } from "../../shared/types.js";
-import { getMockSubscription } from "../lib/mock-subscriptions.js";
 import {
   finishJobRun,
   getAppSettings,
@@ -22,29 +30,19 @@ import {
   startJobRun,
   type DatabaseContext,
 } from "../db/database.js";
+import { fetchRemoteText, type ProxyFetch } from "./remote-text-fetcher.js";
+import { createRuleProviderCache } from "./rule-provider-cache.js";
 
 type SelectorSnapshot = Array<{ proxy: string; name: string }>;
 
 export type JobService = ReturnType<typeof createJobService>;
-type ProxyFetch = typeof undiciFetch;
 type JobServiceDeps = {
   proxyFetch?: ProxyFetch;
+  now?: () => number;
 };
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function createFetchOptions(proxyUrl: string | null | undefined, timeoutMs: number) {
-  const options: { signal: AbortSignal; dispatcher?: ProxyAgent } = {
-    signal: AbortSignal.timeout(timeoutMs),
-  };
-
-  if (proxyUrl) {
-    options.dispatcher = new ProxyAgent(proxyUrl);
-  }
-
-  return options;
 }
 
 function buildControllerHeaders(secret: string, headers: Record<string, string> = {}) {
@@ -66,23 +64,6 @@ async function writeConfigFile(targetPath: string, yamlText: string) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to write compiled config to ${targetPath}: ${message}`);
   }
-}
-
-async function fetchText(url: string, proxyUrl: string | null = null, proxyFetch: ProxyFetch = undiciFetch): Promise<string> {
-  const mockContent = getMockSubscription(url);
-  if (mockContent) {
-    return mockContent;
-  }
-
-  const response = proxyUrl
-    ? await proxyFetch(url, createFetchOptions(proxyUrl, 30_000))
-    : await fetch(url, createFetchOptions(null, 30_000));
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}`);
-  }
-
-  return response.text();
 }
 
 async function readSelectors(target: Awaited<ReturnType<typeof getClashTarget>>): Promise<SelectorSnapshot> {
@@ -150,7 +131,11 @@ async function reloadClash(target: Awaited<ReturnType<typeof getClashTarget>>): 
 
 export function createJobService(context: DatabaseContext, deps: JobServiceDeps = {}) {
   let running = false;
-  const proxyFetch = deps.proxyFetch ?? undiciFetch;
+  const proxyFetch = deps.proxyFetch;
+  const ruleProviderCache = createRuleProviderCache(
+    (url, proxyUrl) => fetchRemoteText(url, proxyUrl, proxyFetch),
+    deps.now,
+  );
 
   async function refreshSource(sourceId: number) {
     const source = await getSource(context, sourceId);
@@ -160,7 +145,7 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     const settings = await getAppSettings(context);
 
     try {
-      const rawYaml = await fetchText(source.url, settings.fetchProxyUrl, proxyFetch);
+      const rawYaml = await fetchRemoteText(source.url, settings.fetchProxyUrl, proxyFetch);
       const parsed = parseClashSubscription(rawYaml);
 
       return insertSnapshot(context, {
@@ -195,7 +180,7 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     try {
       for (const source of sources.filter((item) => item.enabled)) {
         try {
-          const rawYaml = await fetchText(source.url, settings.fetchProxyUrl, proxyFetch);
+          const rawYaml = await fetchRemoteText(source.url, settings.fetchProxyUrl, proxyFetch);
           const parsed = parseClashSubscription(rawYaml);
           await insertSnapshot(context, {
             sourceId: source.id!,
@@ -331,6 +316,7 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     token: string,
     client: SubscriptionClientId,
     kind: SubscriptionKind,
+    subscriptionOrigin = "",
   ): Promise<SubscriptionDocument | null> {
     const deviceProfile = await getDeviceProfileByToken(context, token);
     if (!deviceProfile || !deviceProfile.enabled) {
@@ -366,10 +352,37 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     }
 
     if (kind === "profile") {
-      return exportClientProfileDocument(compiled.config, client);
+      const options = subscriptionOrigin
+        ? {
+            ruleSetUrl: (providerName: string) =>
+              `${subscriptionOrigin.replace(/\/$/, "")}${buildSubscriptionRuleSetPath(token, client, providerName)}`,
+          }
+        : undefined;
+      return exportClientProfileDocument(compiled.config, client, options);
     }
 
     return exportSubscriptionDocument(compiled.config, client);
+  }
+
+  async function getSubscriptionRuleSetDocument(
+    token: string,
+    client: SubscriptionRuleClientId,
+    providerName: string,
+  ): Promise<RuleSetDocument | null> {
+    const deviceProfile = await getDeviceProfileByToken(context, token);
+    if (!deviceProfile || !deviceProfile.enabled) {
+      return null;
+    }
+
+    const compiled = await buildCompiledConfig(deviceProfile);
+    const source = readRuleProviderSource(compiled.config, providerName);
+    if (!source) {
+      return null;
+    }
+
+    const settings = await getAppSettings(context);
+    const cached = await ruleProviderCache.get(source, settings.fetchProxyUrl);
+    return exportRuleSetDocument(source, cached.content, client, cached.warning ? [cached.warning] : []);
   }
 
   return {
@@ -380,6 +393,7 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     buildAndApplyConfig,
     getSubscriptionYaml,
     getSubscriptionDocument,
+    getSubscriptionRuleSetDocument,
     isRunning: () => running,
   };
 }

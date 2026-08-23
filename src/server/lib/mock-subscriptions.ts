@@ -42,6 +42,12 @@ const MOCK_SUBSCRIPTIONS: Record<string, string> = {
     cipher: aes-256-gcm
     password: demo-tw-01
 `,
+  "mock://rules/apple": `payload:
+  - DOMAIN-SUFFIX,apple.com
+  - DOMAIN,cdn.example.com
+  - IP-CIDR,192.0.2.0/24,no-resolve
+`,
+  "mock://rules/invalid": "proxies: []\n",
 };
 
 export function getMockSubscription(url: string): string | null {

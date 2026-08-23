@@ -7,7 +7,11 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import type { MihomoConnection, RuntimeEvent, RuntimeOverviewState, RuntimeSnapshot } from "../shared/telemetry.js";
-import type { SubscriptionClientId, SubscriptionKind } from "../shared/subscription-clients.js";
+import {
+  isSubscriptionRuleClientId,
+  type SubscriptionClientId,
+  type SubscriptionKind,
+} from "../shared/subscription-clients.js";
 import {
   createCustomRule,
   createDeviceProfile,
@@ -86,17 +90,38 @@ const subscriptionRoutes: Array<[string, SubscriptionClientId, SubscriptionKind]
   ["shadowrocket.txt", "shadowrocket", "nodes"],
 ];
 
+function firstForwardedHeader(value: string | string[] | undefined): string {
+  const header = Array.isArray(value) ? value[0] : value;
+  return header?.split(",")[0]?.trim() ?? "";
+}
+
+function subscriptionOrigin(request: FastifyRequest): string {
+  const forwardedProtocol = firstForwardedHeader(request.headers["x-forwarded-proto"]);
+  const protocol = forwardedProtocol === "http" || forwardedProtocol === "https" ? forwardedProtocol : request.protocol;
+  const forwardedHost = firstForwardedHeader(request.headers["x-forwarded-host"]);
+  const host = forwardedHost || request.headers.host || request.hostname;
+  return `${protocol}://${host}`;
+}
+
+function safeContentDispositionFilename(filename: string): string {
+  return filename.replace(/["\r\n]/g, "").replace(/[^\x20-\x7e]/g, "_");
+}
+
 function registerSubscriptionRoutes(app: FastifyInstance, jobs: JobService) {
   const sendSubscription = (client: SubscriptionClientId, kind: SubscriptionKind) => {
     return async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
-      const document = await jobs.getSubscriptionDocument(request.params.token, client, kind);
+      const document = await jobs.getSubscriptionDocument(
+        request.params.token,
+        client,
+        kind,
+        subscriptionOrigin(request),
+      );
       if (!document) {
         return reply.code(404).type("text/plain; charset=utf-8").send("未找到订阅。");
       }
 
-      const safeFilename = document.filename.replace(/["\r\n]/g, "").replace(/[^\x20-\x7e]/g, "_");
       reply.header("cache-control", "no-store");
-      reply.header("content-disposition", `inline; filename="${safeFilename}"`);
+      reply.header("content-disposition", `inline; filename="${safeContentDispositionFilename(document.filename)}"`);
       return reply.type(document.contentType).send(document.content);
     };
   };
@@ -104,6 +129,37 @@ function registerSubscriptionRoutes(app: FastifyInstance, jobs: JobService) {
   for (const [suffix, client, kind] of subscriptionRoutes) {
     app.get(`/subscriptions/:token/${suffix}`, sendSubscription(client, kind));
   }
+
+  app.get(
+    "/subscriptions/:token/rules/:client/:providerFile",
+    async (
+      request: FastifyRequest<{ Params: { token: string; client: string; providerFile: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const { token, client, providerFile } = request.params;
+      if (!isSubscriptionRuleClientId(client) || !providerFile.endsWith(".list")) {
+        return reply.code(404).type("text/plain; charset=utf-8").send("未找到规则集。");
+      }
+
+      const providerName = providerFile.slice(0, -".list".length);
+      try {
+        const document = await jobs.getSubscriptionRuleSetDocument(token, client, providerName);
+        if (!document) {
+          return reply.code(404).type("text/plain; charset=utf-8").send("未找到规则集。");
+        }
+
+        reply.header("cache-control", "no-store");
+        reply.header("content-disposition", `inline; filename="${safeContentDispositionFilename(document.filename)}"`);
+        reply.header("x-rule-count", document.ruleCount);
+        reply.header("x-rule-skipped-count", document.skippedCount);
+        return reply.type(document.contentType).send(document.content);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        request.log.warn({ error, providerName, client }, "Failed to convert subscription rule provider");
+        return reply.code(502).type("text/plain; charset=utf-8").send(`规则集转换失败：${message}`);
+      }
+    },
+  );
 }
 
 function sendScopedRuntimeInitialEvents(sendEvent: RuntimeEventSender, section: RuntimeEventSection, snapshot: RuntimeSnapshot) {

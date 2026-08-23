@@ -80,14 +80,27 @@ describe("client subscription routes", () => {
       name: "Apple",
       mode: "structured",
       behavior: "classical",
-      format: "text",
-      url: "https://rules.example.com/apple.list",
+      format: "yaml",
+      url: "mock://rules/apple",
       interval: 3600,
       path: "",
       rawYaml: "",
       policy: "FINAL",
       enabled: true,
       sortOrder: 20,
+    });
+    await createRuleProvider(context, {
+      name: "Invalid",
+      mode: "structured",
+      behavior: "classical",
+      format: "yaml",
+      url: "mock://rules/invalid",
+      interval: 3600,
+      path: "",
+      rawYaml: "",
+      policy: "FINAL",
+      enabled: true,
+      sortOrder: 30,
     });
 
     const app = await createApp(context);
@@ -108,7 +121,15 @@ describe("client subscription routes", () => {
         app.inject({ method: "GET", url: "/subscriptions/route-token/mihomo-nodes.yaml" }),
         app.inject({ method: "GET", url: "/subscriptions/route-token/mihomo-profile.yaml" }),
         app.inject({ method: "GET", url: "/subscriptions/route-token/surge-nodes.conf" }),
-        app.inject({ method: "GET", url: "/subscriptions/route-token/surge-profile.conf" }),
+        app.inject({
+          method: "GET",
+          url: "/subscriptions/route-token/surge-profile.conf",
+          headers: {
+            host: "internal:4000",
+            "x-forwarded-host": "subscriptions.example.test",
+            "x-forwarded-proto": "https",
+          },
+        }),
         app.inject({ method: "GET", url: "/subscriptions/route-token/quantumult-x-profile.conf" }),
         app.inject({ method: "GET", url: "/subscriptions/route-token/loon-profile.conf" }),
         app.inject({ method: "GET", url: "/subscriptions/route-token/shadowrocket-nodes.txt" }),
@@ -137,24 +158,54 @@ describe("client subscription routes", () => {
 
       expect(surgeProfile.body).toContain("[Proxy Group]");
       expect(surgeProfile.body).toContain("DOMAIN-SUFFIX,example.com,FINAL");
-      expect(surgeProfile.body).toContain("RULE-SET,https://rules.example.com/apple.list,FINAL");
+      expect(surgeProfile.body).toContain(
+        "RULE-SET,https://subscriptions.example.test/subscriptions/route-token/rules/surge/Apple.list,FINAL",
+      );
 
       expect(quantumultXProfile.body).toContain("[server_local]");
       expect(quantumultXProfile.body).toContain("[filter_remote]");
+      expect(quantumultXProfile.body).toContain(
+        "http://localhost:80/subscriptions/route-token/rules/quantumult-x/Apple.list",
+      );
       expect(quantumultXProfile.body).toContain("force-policy=FINAL");
+      expect(quantumultXProfile.body).not.toContain("使用 YAML 格式");
 
       expect(loonProfile.body).toContain("[Remote Rule]");
+      expect(loonProfile.body).toContain("/subscriptions/route-token/rules/loon/Apple.list");
       expect(loonProfile.body).toContain("policy=FINAL");
 
       expect(shadowrocketNodes.headers["content-disposition"]).toContain("shadowrocket-nodes.txt");
       expect(Buffer.from(shadowrocketNodes.body.trim(), "base64").toString("utf8")).toContain("ss://");
       expect(shadowrocketProfile.body).toContain("[Proxy Group]");
       expect(shadowrocketProfile.body).toContain("[Rule]");
+      expect(shadowrocketProfile.body).toContain("/subscriptions/route-token/rules/shadowrocket/Apple.list");
 
       expect(legacyMihomo.body).toBe(mihomoProfile.body);
       expect(legacySurge.body).toBe(surgeNodes.body);
 
       expect(missing.statusCode).toBe(404);
+
+      const [surgeRules, quantumultXRules, loonRules, shadowrocketRules, missingRules, invalidRules] = await Promise.all([
+        app.inject({ method: "GET", url: "/subscriptions/route-token/rules/surge/Apple.list" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/rules/quantumult-x/Apple.list" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/rules/loon/Apple.list" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/rules/shadowrocket/Apple.list" }),
+        app.inject({ method: "GET", url: "/subscriptions/missing-token/rules/surge/Apple.list" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/rules/surge/Invalid.list" }),
+      ]);
+
+      expect(surgeRules.statusCode).toBe(200);
+      expect(surgeRules.headers["content-type"]).toContain("text/plain");
+      expect(surgeRules.headers["x-rule-count"]).toBe("3");
+      expect(surgeRules.body).toContain("DOMAIN-SUFFIX,apple.com");
+      expect(surgeRules.body).toContain("IP-CIDR,192.0.2.0/24,no-resolve");
+      expect(quantumultXRules.body).toContain("host-suffix,apple.com,direct");
+      expect(quantumultXRules.body).toContain("ip-cidr,192.0.2.0/24,direct");
+      expect(loonRules.body).toContain("DOMAIN,cdn.example.com");
+      expect(shadowrocketRules.body).toContain("DOMAIN-SUFFIX,apple.com");
+      expect(missingRules.statusCode).toBe(404);
+      expect(invalidRules.statusCode).toBe(502);
+      expect(invalidRules.body).toContain("Clash YAML 缺少 payload 数组");
     } finally {
       await app.close();
     }

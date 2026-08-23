@@ -20,6 +20,10 @@ import {
 
 type ProfileClient = Exclude<SubscriptionClientId, "mihomo">;
 
+export type ClientProfileExportOptions = {
+  ruleSetUrl?: (providerName: string) => string;
+};
+
 type PreparedProfile = {
   groupLines: string[];
   localRules: string[];
@@ -238,7 +242,11 @@ function nativeRuleType(client: ProfileClient, type: string): string | null {
   return client === "shadowrocket" && type === "IP-CIDR6" ? "IP-CIDR" : type;
 }
 
-function buildPreparedProfile(config: Record<string, unknown>, client: ProfileClient): PreparedProfile {
+function buildPreparedProfile(
+  config: Record<string, unknown>,
+  client: ProfileClient,
+  options: ClientProfileExportOptions,
+): PreparedProfile {
   const proxies = Array.isArray(config.proxies) ? (config.proxies as ParsedProxy[]) : [];
   const groups = Array.isArray(config["proxy-groups"])
     ? (config["proxy-groups"] as ProxyRecord[])
@@ -322,12 +330,13 @@ function buildPreparedProfile(config: Record<string, unknown>, client: ProfileCl
     if (type === "RULE-SET") {
       const providerName = parts[1] ?? "";
       const provider = recordValue(providers, providerName);
-      const url = textValue(provider, "url");
-      if (!url) {
+      const sourceUrl = textValue(provider, "url");
+      if (!sourceUrl) {
         warn(`规则集 ${providerName} 缺少可用于 ${client} 的远程地址`);
         continue;
       }
-      if (textValue(provider, "format") === "yaml") {
+      const url = options.ruleSetUrl?.(providerName) ?? sourceUrl;
+      if (!options.ruleSetUrl && textValue(provider, "format") === "yaml") {
         warn(`规则集 ${providerName} 使用 YAML 格式，请确认上游同时兼容 ${client}`);
       }
       const policy = mapPolicy(parts[2] ?? "FINAL");
@@ -412,8 +421,9 @@ function buildProfileContent(client: ProfileClient, profile: PreparedProfile): s
 export function exportClientProfileDocument(
   config: Record<string, unknown>,
   client: ProfileClient,
+  options: ClientProfileExportOptions = {},
 ): SubscriptionDocument {
-  const profile = buildPreparedProfile(config, client);
+  const profile = buildPreparedProfile(config, client, options);
   return {
     client,
     kind: "profile",

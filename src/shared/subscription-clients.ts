@@ -68,6 +68,14 @@ export const subscriptionClients = [
 
 export type SubscriptionClientId = (typeof subscriptionClients)[number]["id"];
 
+export const subscriptionRuleClients = ["surge", "quantumult-x", "loon", "shadowrocket"] as const;
+
+export type SubscriptionRuleClientId = (typeof subscriptionRuleClients)[number];
+
+export function isSubscriptionRuleClientId(value: string): value is SubscriptionRuleClientId {
+  return subscriptionRuleClients.some((client) => client === value);
+}
+
 export function buildSubscriptionPath(
   token: string,
   clientId: SubscriptionClientId = "mihomo",
@@ -75,4 +83,12 @@ export function buildSubscriptionPath(
 ) {
   const client = subscriptionClients.find((item) => item.id === clientId) ?? subscriptionClients[0];
   return `/subscriptions/${encodeURIComponent(token)}/${client.paths[kind]}`;
+}
+
+export function buildSubscriptionRuleSetPath(
+  token: string,
+  clientId: SubscriptionRuleClientId,
+  providerName: string,
+) {
+  return `/subscriptions/${encodeURIComponent(token)}/rules/${clientId}/${encodeURIComponent(providerName)}.list`;
 }
