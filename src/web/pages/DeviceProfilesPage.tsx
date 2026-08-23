@@ -277,7 +277,7 @@ export function DeviceProfilesPage() {
         <div className="section-header">
           <div>
             <h3>入口列表</h3>
-            <p className="muted">同一个设备 token 可生成 Mihomo、Surge 与 Quantumult X 三种原生订阅资源。</p>
+            <p className="muted">同一个设备 token 可为五种客户端生成节点订阅和完整配置。</p>
           </div>
           <div className="inline-actions">
             <span className="chip">{deviceItems.length} 个入口</span>
@@ -443,7 +443,7 @@ export function DeviceProfilesPage() {
                 ) : (
                   <div className="empty-state compact-empty-state">
                     <strong>保存后生成订阅地址</strong>
-                    <p className="muted">创建完成后，这里会出现该入口的预览配置和三种客户端专属地址。</p>
+                    <p className="muted">创建完成后，这里会出现该入口的预览配置，以及五种客户端的两类订阅地址。</p>
                   </div>
                 )}
               </section>

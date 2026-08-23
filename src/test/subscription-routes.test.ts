@@ -3,7 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../server/app";
-import { createDatabase, createDeviceProfile, createSource, insertSnapshot, seedDatabase } from "../server/db/database";
+import {
+  createCustomRule,
+  createDatabase,
+  createDeviceProfile,
+  createRuleProvider,
+  createSource,
+  insertSnapshot,
+  seedDatabase,
+} from "../server/db/database";
 import { getRuntimeConfig } from "../server/lib/runtime";
 
 describe("client subscription routes", () => {
@@ -59,38 +67,92 @@ describe("client subscription routes", () => {
       mode: null,
       fragmentOverrides: [],
     });
+    await createCustomRule(context, {
+      type: "DOMAIN-SUFFIX",
+      target: "example.com",
+      policy: "FINAL",
+      noResolve: false,
+      note: "route export test",
+      enabled: true,
+      sortOrder: 10,
+    });
+    await createRuleProvider(context, {
+      name: "Apple",
+      mode: "structured",
+      behavior: "classical",
+      format: "text",
+      url: "https://rules.example.com/apple.list",
+      interval: 3600,
+      path: "",
+      rawYaml: "",
+      policy: "FINAL",
+      enabled: true,
+      sortOrder: 20,
+    });
 
     const app = await createApp(context);
     try {
-      const [mihomo, surge, quantumultX, loon, shadowrocket, missing] = await Promise.all([
+      const [
+        mihomoNodes,
+        mihomoProfile,
+        surgeNodes,
+        surgeProfile,
+        quantumultXProfile,
+        loonProfile,
+        shadowrocketNodes,
+        shadowrocketProfile,
+        legacyMihomo,
+        legacySurge,
+        missing,
+      ] = await Promise.all([
+        app.inject({ method: "GET", url: "/subscriptions/route-token/mihomo-nodes.yaml" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/mihomo-profile.yaml" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/surge-nodes.conf" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/surge-profile.conf" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/quantumult-x-profile.conf" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/loon-profile.conf" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/shadowrocket-nodes.txt" }),
+        app.inject({ method: "GET", url: "/subscriptions/route-token/shadowrocket-profile.conf" }),
         app.inject({ method: "GET", url: "/subscriptions/route-token/mihomo.yaml" }),
         app.inject({ method: "GET", url: "/subscriptions/route-token/surge.conf" }),
-        app.inject({ method: "GET", url: "/subscriptions/route-token/quantumult-x.conf" }),
-        app.inject({ method: "GET", url: "/subscriptions/route-token/loon.conf" }),
-        app.inject({ method: "GET", url: "/subscriptions/route-token/shadowrocket.txt" }),
         app.inject({ method: "GET", url: "/subscriptions/missing-token/surge.conf" }),
       ]);
 
-      expect(mihomo.statusCode).toBe(200);
-      expect(mihomo.headers["content-type"]).toContain("application/yaml");
-      expect(mihomo.headers["content-disposition"]).toContain("iphone.yaml");
-      expect(mihomo.body).toContain("Hong Kong 01");
+      expect(mihomoNodes.statusCode).toBe(200);
+      expect(mihomoNodes.headers["content-type"]).toContain("application/yaml");
+      expect(mihomoNodes.headers["content-disposition"]).toContain("mihomo-nodes.yaml");
+      expect(mihomoNodes.body).toContain("Hong Kong 01");
+      expect(mihomoNodes.body).not.toContain("proxy-groups:");
 
-      expect(surge.statusCode).toBe(200);
-      expect(surge.headers["content-type"]).toContain("text/plain");
-      expect(surge.headers["cache-control"]).toBe("no-store");
-      expect(surge.body).toContain("Hong Kong 01 = ss, 192.0.2.1, 443");
+      expect(mihomoProfile.statusCode).toBe(200);
+      expect(mihomoProfile.headers["content-disposition"]).toContain("iphone.yaml");
+      expect(mihomoProfile.body).toContain("proxy-groups:");
+      expect(mihomoProfile.body).toContain("rule-providers:");
 
-      expect(quantumultX.statusCode).toBe(200);
-      expect(quantumultX.body).toContain("shadowsocks=192.0.2.1:443");
-      expect(quantumultX.body).toContain("tag=Hong Kong 01");
+      expect(surgeNodes.statusCode).toBe(200);
+      expect(surgeNodes.headers["content-type"]).toContain("text/plain");
+      expect(surgeNodes.headers["cache-control"]).toBe("no-store");
+      expect(surgeNodes.body).toContain("Hong Kong 01 = ss, 192.0.2.1, 443");
+      expect(surgeNodes.body).not.toContain("[Rule]");
 
-      expect(loon.statusCode).toBe(200);
-      expect(loon.body).toContain("Hong Kong 01 = Shadowsocks,192.0.2.1,443");
+      expect(surgeProfile.body).toContain("[Proxy Group]");
+      expect(surgeProfile.body).toContain("DOMAIN-SUFFIX,example.com,FINAL");
+      expect(surgeProfile.body).toContain("RULE-SET,https://rules.example.com/apple.list,FINAL");
 
-      expect(shadowrocket.statusCode).toBe(200);
-      expect(shadowrocket.headers["content-disposition"]).toContain("shadowrocket.txt");
-      expect(Buffer.from(shadowrocket.body.trim(), "base64").toString("utf8")).toContain("ss://");
+      expect(quantumultXProfile.body).toContain("[server_local]");
+      expect(quantumultXProfile.body).toContain("[filter_remote]");
+      expect(quantumultXProfile.body).toContain("force-policy=FINAL");
+
+      expect(loonProfile.body).toContain("[Remote Rule]");
+      expect(loonProfile.body).toContain("policy=FINAL");
+
+      expect(shadowrocketNodes.headers["content-disposition"]).toContain("shadowrocket-nodes.txt");
+      expect(Buffer.from(shadowrocketNodes.body.trim(), "base64").toString("utf8")).toContain("ss://");
+      expect(shadowrocketProfile.body).toContain("[Proxy Group]");
+      expect(shadowrocketProfile.body).toContain("[Rule]");
+
+      expect(legacyMihomo.body).toBe(mihomoProfile.body);
+      expect(legacySurge.body).toBe(surgeNodes.body);
 
       expect(missing.statusCode).toBe(404);
     } finally {

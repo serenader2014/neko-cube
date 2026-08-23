@@ -1724,11 +1724,11 @@ button:disabled {
 
 .subscription-link-row {
   display: grid;
-  grid-template-columns: minmax(8.75rem, 0.72fr) minmax(0, 1.5fr) auto;
-  align-items: center;
-  gap: 0.7rem;
+  grid-template-columns: minmax(9.5rem, 0.62fr) minmax(0, 1.72fr);
+  align-items: start;
+  gap: 0.85rem;
   min-width: 0;
-  padding: 0.62rem 0.68rem;
+  padding: 0.72rem;
 }
 
 .subscription-link-row + .subscription-link-row {
@@ -1740,6 +1740,7 @@ button:disabled {
   align-items: center;
   gap: 0.58rem;
   min-width: 0;
+  padding-top: 0.28rem;
 }
 
 .subscription-client-mark {
@@ -1800,10 +1801,51 @@ button:disabled {
   font-size: 0.68rem;
 }
 
+.subscription-link-options {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 0.72rem;
+  background: color-mix(in srgb, var(--panel) 62%, transparent);
+}
+
+.subscription-link-option {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.58rem;
+  min-width: 0;
+  padding: 0.46rem 0.5rem;
+}
+
+.subscription-link-option + .subscription-link-option {
+  border-top: 1px solid color-mix(in srgb, var(--line) 64%, transparent);
+}
+
+.subscription-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.55rem;
+  padding: 0.22rem 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 34%, transparent);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.subscription-kind-badge.is-profile {
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--panel));
+  color: var(--accent-strong);
+}
+
 .subscription-link-value {
   display: block;
   min-width: 0;
-  padding: 0.42rem 0.55rem;
+  padding: 0.4rem 0.52rem;
   border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
   border-radius: 0.58rem;
   background: color-mix(in srgb, var(--panel) 76%, transparent);
@@ -1830,8 +1872,8 @@ button:disabled {
 }
 
 .subscription-copy-button {
-  min-height: 2rem;
-  padding: 0.32rem 0.62rem;
+  min-height: 2.2rem;
+  padding: 0.32rem 0.66rem;
   font-size: 0.76rem;
 }
 
@@ -6605,13 +6647,26 @@ button:disabled {
 
 @container (max-width: 42rem) {
   .subscription-link-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .subscription-client-meta {
+    padding: 0 0.18rem;
+  }
+}
+
+@container (max-width: 30rem) {
+  .subscription-link-option {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .subscription-kind-badge {
+    justify-self: start;
   }
 
   .subscription-link-value {
     grid-column: 1 / -1;
     grid-row: 2;
-    padding: 0.2rem 0.12rem 0.05rem;
   }
 }
 

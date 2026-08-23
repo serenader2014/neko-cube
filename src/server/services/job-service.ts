@@ -1,10 +1,12 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import yaml from "js-yaml";
 import { fetch as undiciFetch, ProxyAgent } from "undici";
 import { compileClashConfig } from "../../shared/compile.js";
 import { exportSubscriptionDocument, type SubscriptionDocument } from "../../shared/subscription-export.js";
-import type { SubscriptionClientId } from "../../shared/subscription-clients.js";
+import { exportClientProfileDocument } from "../../shared/subscription-profile-export.js";
+import type { SubscriptionClientId, SubscriptionKind } from "../../shared/subscription-clients.js";
 import { parseClashSubscription } from "../../shared/subscription.js";
 import type { DeviceProfile } from "../../shared/types.js";
 import { getMockSubscription } from "../lib/mock-subscriptions.js";
@@ -328,6 +330,7 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
   async function getSubscriptionDocument(
     token: string,
     client: SubscriptionClientId,
+    kind: SubscriptionKind,
   ): Promise<SubscriptionDocument | null> {
     const deviceProfile = await getDeviceProfileByToken(context, token);
     if (!deviceProfile || !deviceProfile.enabled) {
@@ -335,9 +338,10 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     }
 
     const compiled = await buildCompiledConfig(deviceProfile);
-    if (client === "mihomo") {
+    if (client === "mihomo" && kind === "profile") {
       return {
         client,
+        kind,
         content: compiled.yaml,
         contentType: "application/yaml; charset=utf-8",
         filename: deviceProfile.filename,
@@ -345,6 +349,24 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
         skippedCount: 0,
         warnings: compiled.warnings,
       };
+    }
+
+    if (client === "mihomo") {
+      const proxies = Array.isArray(compiled.config.proxies) ? compiled.config.proxies : [];
+      return {
+        client,
+        kind,
+        content: yaml.dump({ proxies }, { noRefs: true, lineWidth: 120 }),
+        contentType: "application/yaml; charset=utf-8",
+        filename: "mihomo-nodes.yaml",
+        proxyCount: proxies.length,
+        skippedCount: 0,
+        warnings: compiled.warnings,
+      };
+    }
+
+    if (kind === "profile") {
+      return exportClientProfileDocument(compiled.config, client);
     }
 
     return exportSubscriptionDocument(compiled.config, client);

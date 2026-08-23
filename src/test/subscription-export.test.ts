@@ -102,7 +102,7 @@ describe("exportSubscriptionDocument", () => {
   it("exports a native Loon node subscription", () => {
     const result = exportSubscriptionDocument(config, "loon");
 
-    expect(result.filename).toBe("loon.conf");
+    expect(result.filename).toBe("loon-nodes.conf");
     expect(result.proxyCount).toBe(5);
     expect(result.skippedCount).toBe(1);
     expect(result.content).toContain(
@@ -123,7 +123,7 @@ describe("exportSubscriptionDocument", () => {
     const result = exportSubscriptionDocument(config, "shadowrocket");
     const decoded = Buffer.from(result.content.trim(), "base64").toString("utf8");
 
-    expect(result.filename).toBe("shadowrocket.txt");
+    expect(result.filename).toBe("shadowrocket-nodes.txt");
     expect(result.proxyCount).toBe(5);
     expect(result.skippedCount).toBe(1);
     expect(decoded).toContain("ss://");

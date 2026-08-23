@@ -3,11 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import fsSync from "node:fs";
-import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import type { MihomoConnection, RuntimeEvent, RuntimeOverviewState, RuntimeSnapshot } from "../shared/telemetry.js";
-import type { SubscriptionClientId } from "../shared/subscription-clients.js";
+import type { SubscriptionClientId, SubscriptionKind } from "../shared/subscription-clients.js";
 import {
   createCustomRule,
   createDeviceProfile,
@@ -49,7 +49,7 @@ import {
   type DatabaseContext,
 } from "./db/database.js";
 import { createScheduler } from "./services/scheduler.js";
-import { createJobService } from "./services/job-service.js";
+import { createJobService, type JobService } from "./services/job-service.js";
 import { TelemetryService } from "./services/telemetry-service.js";
 import { createGeoIpDatabaseUpdater } from "./services/geoip-database-updater.js";
 import { getTelemetrySettings } from "./db/telemetry-db.js";
@@ -62,6 +62,48 @@ type RuntimeEventSender = (type: string, payload: unknown) => void;
 
 function parseRuntimeEventSection(value: string | undefined): RuntimeEventSection {
   return value === "proxies" || value === "connections" || value === "logs" ? value : "overview";
+}
+
+const subscriptionRoutes: Array<[string, SubscriptionClientId, SubscriptionKind]> = [
+  ["mihomo-nodes.yaml", "mihomo", "nodes"],
+  ["mihomo-profile.yaml", "mihomo", "profile"],
+  ["clash-nodes.yaml", "mihomo", "nodes"],
+  ["clash-profile.yaml", "mihomo", "profile"],
+  ["surge-nodes.conf", "surge", "nodes"],
+  ["surge-profile.conf", "surge", "profile"],
+  ["quantumult-x-nodes.conf", "quantumult-x", "nodes"],
+  ["quantumult-x-profile.conf", "quantumult-x", "profile"],
+  ["loon-nodes.conf", "loon", "nodes"],
+  ["loon-profile.conf", "loon", "profile"],
+  ["shadowrocket-nodes.txt", "shadowrocket", "nodes"],
+  ["shadowrocket-profile.conf", "shadowrocket", "profile"],
+  // Compatibility aliases: keep the formats published before the split.
+  ["mihomo.yaml", "mihomo", "profile"],
+  ["clash.yaml", "mihomo", "profile"],
+  ["surge.conf", "surge", "nodes"],
+  ["quantumult-x.conf", "quantumult-x", "nodes"],
+  ["loon.conf", "loon", "nodes"],
+  ["shadowrocket.txt", "shadowrocket", "nodes"],
+];
+
+function registerSubscriptionRoutes(app: FastifyInstance, jobs: JobService) {
+  const sendSubscription = (client: SubscriptionClientId, kind: SubscriptionKind) => {
+    return async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+      const document = await jobs.getSubscriptionDocument(request.params.token, client, kind);
+      if (!document) {
+        return reply.code(404).type("text/plain; charset=utf-8").send("未找到订阅。");
+      }
+
+      const safeFilename = document.filename.replace(/["\r\n]/g, "").replace(/[^\x20-\x7e]/g, "_");
+      reply.header("cache-control", "no-store");
+      reply.header("content-disposition", `inline; filename="${safeFilename}"`);
+      return reply.type(document.contentType).send(document.content);
+    };
+  };
+
+  for (const [suffix, client, kind] of subscriptionRoutes) {
+    app.get(`/subscriptions/:token/${suffix}`, sendSubscription(client, kind));
+  }
 }
 
 function sendScopedRuntimeInitialEvents(sendEvent: RuntimeEventSender, section: RuntimeEventSection, snapshot: RuntimeSnapshot) {
@@ -568,26 +610,7 @@ export async function createApp(context: DatabaseContext) {
     return compiled;
   });
 
-  const sendSubscription = (client: SubscriptionClientId) => {
-    return async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
-      const document = await jobs.getSubscriptionDocument(request.params.token, client);
-      if (!document) {
-        return reply.code(404).type("text/plain; charset=utf-8").send("未找到订阅。");
-      }
-
-      const safeFilename = document.filename.replace(/["\r\n]/g, "").replace(/[^\x20-\x7e]/g, "_");
-      reply.header("cache-control", "no-store");
-      reply.header("content-disposition", `inline; filename="${safeFilename}"`);
-      return reply.type(document.contentType).send(document.content);
-    };
-  };
-
-  app.get("/subscriptions/:token/mihomo.yaml", sendSubscription("mihomo"));
-  app.get("/subscriptions/:token/clash.yaml", sendSubscription("mihomo"));
-  app.get("/subscriptions/:token/surge.conf", sendSubscription("surge"));
-  app.get("/subscriptions/:token/quantumult-x.conf", sendSubscription("quantumult-x"));
-  app.get("/subscriptions/:token/loon.conf", sendSubscription("loon"));
-  app.get("/subscriptions/:token/shadowrocket.txt", sendSubscription("shadowrocket"));
+  registerSubscriptionRoutes(app, jobs);
 
   app.get("/*", async (request, reply) => {
     const indexPath = path.join(publicDir, "index.html");
