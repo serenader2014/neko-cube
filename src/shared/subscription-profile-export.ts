@@ -13,6 +13,7 @@ import {
   type ProxyConversion,
   type ProxyRecord,
   recordValue,
+  sanitizeName,
   textValue,
   uniqueName,
   webSocketOptions,
@@ -34,6 +35,20 @@ type PreparedProfile = {
 };
 
 const DIRECT_POLICIES = new Set(["DIRECT", "REJECT"]);
+const QUANTUMULT_X_RESERVED_POLICIES = new Set(["direct", "proxy", "reject"]);
+
+function uniqueProfileName(
+  client: ProfileClient,
+  value: string,
+  kind: "server" | "policy",
+  seen: Map<string, number>,
+): string {
+  const sanitized = sanitizeName(value);
+  const safeName = client === "quantumult-x" && QUANTUMULT_X_RESERVED_POLICIES.has(sanitized.toLowerCase())
+    ? `${sanitized} ${kind === "policy" ? "Policy" : "Server"}`
+    : sanitized;
+  return uniqueName(safeName, seen);
+}
 
 function quoteParameter(value: string): string {
   return /[,"]/.test(value) || value !== value.trim()
@@ -269,7 +284,7 @@ function buildPreparedProfile(
 
   for (const proxy of proxies) {
     const originalName = textValue(proxy, "name");
-    const name = uniqueName(originalName, seenNames);
+    const name = uniqueProfileName(client, originalName, "server", seenNames);
     const converted = convertProxy(client, proxy, name);
     if (converted.line === null) {
       warn(`${name}: ${converted.reason}`);
@@ -281,7 +296,7 @@ function buildPreparedProfile(
 
   for (const group of groups) {
     const originalName = textValue(group, "name");
-    groupNames.set(originalName, uniqueName(originalName, seenNames));
+    groupNames.set(originalName, uniqueProfileName(client, originalName, "policy", seenNames));
   }
 
   const fallbackPolicy = groupNames.get("FINAL") ?? (client === "quantumult-x" ? "direct" : "DIRECT");

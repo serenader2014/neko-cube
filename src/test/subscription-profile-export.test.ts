@@ -17,6 +17,11 @@ const config = {
     {
       name: "FINAL",
       type: "select",
+      proxies: ["Proxy", "DIRECT"],
+    },
+    {
+      name: "Proxy",
+      type: "select",
       proxies: ["Hong Kong, 01", "DIRECT"],
     },
     {
@@ -39,6 +44,7 @@ const config = {
   },
   rules: [
     "DOMAIN-SUFFIX,example.com,AUTO",
+    "DOMAIN-SUFFIX,proxy.example,Proxy",
     "IP-CIDR,192.0.2.0/24,DIRECT,no-resolve",
     "RULE-SET,Apple,FINAL",
     "MATCH,FINAL",
@@ -66,6 +72,10 @@ describe("exportClientProfileDocument", () => {
     expect(result.content).toContain("[server_local]");
     expect(result.content).toContain("shadowsocks=192.0.2.1:443");
     expect(result.content).toContain("[policy]");
+    expect(result.content).toContain("static = Proxy Policy, Hong Kong · 01, direct");
+    expect(result.content).toContain("static = FINAL, Proxy Policy, direct");
+    expect(result.content).not.toContain("static = Proxy, Hong Kong · 01");
+    expect(result.content).toContain("host-suffix,proxy.example,Proxy Policy");
     expect(result.content).toContain("url-latency-benchmark = AUTO, Hong Kong · 01, check-interval=300");
     expect(result.content).toContain("[filter_remote]");
     expect(result.content).toContain(
