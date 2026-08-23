@@ -3923,6 +3923,117 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.runtime-action-column,
+.runtime-action-cell {
+  width: 5.6rem;
+  min-width: 5.6rem;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.runtime-row-action-button {
+  min-height: 1.9rem;
+  padding: 0.28rem 0.56rem;
+  border: 1px solid color-mix(in srgb, var(--runtime-accent) 24%, rgba(77, 52, 29, 0.12));
+  border-radius: 0.52rem;
+  background: color-mix(in srgb, var(--accent-soft) 34%, rgba(255, 251, 242, 0.92));
+  color: var(--runtime-accent);
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
+  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+
+.runtime-row-action-button:hover {
+  border-color: color-mix(in srgb, var(--runtime-accent) 48%, rgba(77, 52, 29, 0.12));
+  background: color-mix(in srgb, var(--accent-soft) 58%, rgba(255, 251, 242, 0.92));
+  transform: translateY(-1px);
+}
+
+.runtime-row-action-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--runtime-accent) 48%, transparent);
+  outline-offset: 2px;
+}
+
+.runtime-mobile-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.runtime-mobile-context-hint {
+  color: var(--runtime-muted);
+  font-size: 0.7rem;
+}
+
+.quick-rule-context {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.78rem 0.86rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--line));
+  border-radius: 0.78rem;
+  background: color-mix(in srgb, var(--accent-soft) 24%, var(--panel));
+}
+
+.quick-rule-context span {
+  color: var(--accent-strong);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quick-rule-context p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.quick-rule-form-grid {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.72fr) minmax(14rem, 1.28fr);
+  gap: 0.78rem;
+}
+
+.quick-rule-resolve-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.58rem;
+  width: fit-content;
+  padding: 0.58rem 0.7rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  cursor: pointer;
+}
+
+.quick-rule-resolve-toggle input {
+  margin-top: 0.18rem;
+}
+
+.quick-rule-resolve-toggle span {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.quick-rule-resolve-toggle strong {
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.quick-rule-resolve-toggle small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 720px) {
+  .quick-rule-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .runtime-mxc-table .runtime-table-sort-button {
   color: inherit;
 }

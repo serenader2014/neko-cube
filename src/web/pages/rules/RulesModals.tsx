@@ -2,7 +2,7 @@ import type { CustomRule, RuleProviderDraft } from "@shared/types";
 import { Modal } from "../../components/Modal";
 import { SortListModal } from "../../components/SortListModal";
 import { type BulkProviderEditValues } from "../../lib/rule-providers";
-import { normalizeLegacyPolicyTarget } from "./helpers";
+import { normalizeLegacyPolicyTarget } from "../../lib/rule-targets";
 
 type RulesModalsProps = {
   context: any;

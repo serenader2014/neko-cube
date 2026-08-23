@@ -23,8 +23,6 @@ export const emptyProvider: ProviderFormValues = {
   rawYaml: "",
 };
 
-export const builtinPolicyTargets = ["FINAL", "MANUAL", "DIRECT", "REJECT"] as const;
-
 export const emptyBulkProviderEditValues: BulkProviderEditValues = {
   urlMode: "keep",
   urlValue: "",

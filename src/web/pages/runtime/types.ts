@@ -1,5 +1,6 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { useMutation } from "@tanstack/react-query";
+import type { CustomRule } from "@shared/types";
 import type {
   RuntimeLogLevel,
   RuntimeOverviewState,
@@ -16,6 +17,10 @@ export type ConnectionGroupKey = "none" | "type" | "host" | "rule" | "chain" | "
 export type LogSortKey = "seq" | "level" | "type";
 export type LogSortDirection = "desc" | "asc";
 export type LogGroupKey = "none" | "level" | "type";
+
+export type QuickRuleSeed = Pick<CustomRule, "type" | "target" | "policy" | "noResolve" | "note"> & {
+  context: string;
+};
 
 export type RuntimeShellContext = {
   snapshot: RuntimeSnapshot | null;

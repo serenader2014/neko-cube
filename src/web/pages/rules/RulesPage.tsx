@@ -7,10 +7,9 @@ import { StatusSwitch } from "../../components/StatusSwitch";
 import { pushToast } from "../../components/toast";
 import { withSequentialSortOrder } from "../../lib/sortable";
 import { previewBulkProviderEdits, type BulkProviderEditValues } from "../../lib/rule-providers";
+import { buildPolicyTargetGroups, normalizeLegacyPolicyTarget } from "../../lib/rule-targets";
 import { emptyBulkProviderEditValues, emptyProvider, emptyRule } from "./constants";
 import {
-  buildPolicyTargetGroups,
-  normalizeLegacyPolicyTarget,
   normalizeProviderDraftForSave,
   normalizeProviderForUi,
   parseProviderYamlCollection,

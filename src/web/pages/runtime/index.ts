@@ -2,6 +2,6 @@ export {
   RuntimePage,
   RuntimeOverviewPage,
   RuntimeProxiesPage,
-  RuntimeConnectionsPage,
 } from "./RuntimePage";
+export { RuntimeConnectionsPage } from "./RuntimeConnectionsPage";
 export { RuntimeLogsPage } from "./RuntimeLogsPage";

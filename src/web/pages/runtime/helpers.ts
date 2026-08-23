@@ -7,7 +7,7 @@ import type {
 } from "../../../shared/telemetry";
 import { formatDateTime } from "../../lib/telemetry";
 import { RUNTIME_TRAFFIC_WINDOW_MS } from "./constants";
-import type { ConnectionGroupKey, RuntimeNavItem } from "./types";
+import type { ConnectionGroupKey, QuickRuleSeed, RuntimeNavItem } from "./types";
 
 export function buildProxyTrafficData(connections: MihomoConnection[]) {
   const groups = new Map<string, { label: string; value: number; connections: number }>();
@@ -169,6 +169,63 @@ export function getLogNumericId(id: string) {
 export function extractLogType(payload: string) {
   const match = payload.match(/^\[([^\]]+)\]/);
   return match?.[1] ?? "";
+}
+
+function isIpv4(value: string) {
+  const segments = value.split(".");
+  return segments.length === 4 && segments.every((segment) => /^\d{1,3}$/.test(segment) && Number(segment) <= 255);
+}
+
+function isIpv6(value: string) {
+  return value.includes(":") && /^[0-9a-f:]+$/i.test(value);
+}
+
+function stripDestinationPort(value: string) {
+  const normalized = value.trim().replace(/[),;]+$/, "");
+  const bracketed = normalized.match(/^\[([^\]]+)](?::\d+)?$/);
+  if (bracketed?.[1]) {
+    return bracketed[1];
+  }
+
+  const domainOrIpv4WithPort = normalized.match(/^([^:]+):\d+$/);
+  return domainOrIpv4WithPort?.[1] ?? normalized;
+}
+
+function buildDestinationRuleSeed(
+  destination: string,
+  policy: string,
+  note: string,
+  context: string,
+): QuickRuleSeed {
+  const target = stripDestinationPort(destination);
+  if (isIpv4(target)) {
+    return { type: "IP-CIDR", target: `${target}/32`, policy, noResolve: true, note, context };
+  }
+  if (isIpv6(target)) {
+    return { type: "IP-CIDR6", target: `${target}/128`, policy, noResolve: true, note, context };
+  }
+  return { type: "DOMAIN", target, policy, noResolve: false, note, context };
+}
+
+export function buildConnectionQuickRuleSeed(connection: MihomoConnection): QuickRuleSeed {
+  const destination = connection.metadata.sniffHost || connection.metadata.host || connection.metadata.destinationIP;
+  const source = formatConnectionSource(connection);
+  const title = getConnectionTitle(connection);
+  const policy = connection.chains.at(-1) || "FINAL";
+  return buildDestinationRuleSeed(
+    destination,
+    policy === "GLOBAL" || policy === "AUTO" ? "FINAL" : policy,
+    `来自运行连接：${source} → ${title}`,
+    `${source} → ${title}`,
+  );
+}
+
+export function buildLogQuickRuleSeed(log: { payload: string }): QuickRuleSeed {
+  const destination = log.payload.match(/-->\s+(.+?)(?:\s+match\b|\s+using\b|$)/i)?.[1] ?? "";
+  const rawPolicy = (log.payload.match(/\busing\s+(\S+)/i)?.[1] ?? "FINAL").split("[")[0] || "FINAL";
+  const policy = rawPolicy === "GLOBAL" || rawPolicy === "AUTO" ? "FINAL" : rawPolicy;
+  const context = log.payload.length > 220 ? `${log.payload.slice(0, 217)}…` : log.payload;
+  return buildDestinationRuleSeed(destination, policy, "来自运行日志快速添加", context);
 }
 
 export function formatRuntimeAge(value?: string | null) {

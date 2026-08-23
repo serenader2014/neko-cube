@@ -3,8 +3,9 @@ import type { RuntimeLogEntry, RuntimeLogLevel } from "../../../shared/telemetry
 import { ClearGlyph, GroupOffGlyph, GroupOnGlyph, PauseGlyph, PlayGlyph, SortAscGlyph, SortDescGlyph } from "../../components/icons";
 import { Pager, renderSortMark } from "./components";
 import { EMPTY_LOGS } from "./constants";
-import { extractLogType, getLogNumericId } from "./helpers";
-import type { LogGroupKey, LogSortDirection, LogSortKey } from "./types";
+import { buildLogQuickRuleSeed, extractLogType, getLogNumericId } from "./helpers";
+import { QuickRuleModal } from "./QuickRuleModal";
+import type { LogGroupKey, LogSortDirection, LogSortKey, QuickRuleSeed } from "./types";
 import { useRuntimeShell } from "./useRuntimeShell";
 
 export function RuntimeLogsPage() {
@@ -16,6 +17,7 @@ export function RuntimeLogsPage() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [quickRuleSeed, setQuickRuleSeed] = useState<QuickRuleSeed | null>(null);
   const deferredFilter = useDeferredValue(filter);
 
   const filteredLogs = useMemo(() => {
@@ -167,13 +169,14 @@ export function RuntimeLogsPage() {
                   </div>
                 </th>
                 <th>内容</th>
+                <th className="runtime-action-column">操作</th>
               </tr>
             </thead>
             <tbody>
               {rowModel.map((row) =>
                 row.type === "group" ? (
                   <tr className="runtime-mxc-group-row" key={`group-${row.key}`} onClick={() => setExpandedGroups((current) => ({ ...current, [row.key]: !current[row.key] }))}>
-                    <td className="runtime-mxc-group-cell" colSpan={3}>
+                    <td className="runtime-mxc-group-cell" colSpan={4}>
                       <div className="runtime-mxc-group-inner">
                         <span className="runtime-mxc-group-icon">{expandedGroups[row.key] ? <GroupOffGlyph active /> : <GroupOnGlyph active />}</span>
                         <strong>{row.key}</strong>
@@ -188,6 +191,11 @@ export function RuntimeLogsPage() {
                     </td>
                     <td>{extractLogType(row.log.payload) || "未分类"}</td>
                     <td className="runtime-log-cell">{row.log.payload}</td>
+                    <td className="runtime-action-cell">
+                      <button className="runtime-row-action-button" onClick={() => setQuickRuleSeed(buildLogQuickRuleSeed(row.log))} type="button">
+                        加规则
+                      </button>
+                    </td>
                   </tr>
                 ),
               )}
@@ -219,6 +227,12 @@ export function RuntimeLogsPage() {
                   <span className="runtime-mobile-age">{new Date(row.log.timestamp).toLocaleTimeString("zh-CN", { hour12: false })}</span>
                 </div>
                 <pre className="runtime-mobile-log-payload">{row.log.payload}</pre>
+                <div className="runtime-mobile-card-footer">
+                  <span className="runtime-mobile-context-hint">从这条日志提取目标</span>
+                  <button className="runtime-row-action-button" onClick={() => setQuickRuleSeed(buildLogQuickRuleSeed(row.log))} type="button">
+                    加规则
+                  </button>
+                </div>
               </article>
             ),
           )}
@@ -228,6 +242,7 @@ export function RuntimeLogsPage() {
           <Pager page={page} setPage={setPage} totalItems={filteredLogs.length} totalPages={totalPages} pageSize={pageSize} setPageSize={setPageSize} />
         </div>
       </div>
+      <QuickRuleModal onClose={() => setQuickRuleSeed(null)} seed={quickRuleSeed} />
     </div>
   );
 }
