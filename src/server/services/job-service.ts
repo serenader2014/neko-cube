@@ -3,6 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fetch as undiciFetch, ProxyAgent } from "undici";
 import { compileClashConfig } from "../../shared/compile.js";
+import { exportSubscriptionDocument, type SubscriptionDocument } from "../../shared/subscription-export.js";
+import type { SubscriptionClientId } from "../../shared/subscription-clients.js";
 import { parseClashSubscription } from "../../shared/subscription.js";
 import type { DeviceProfile } from "../../shared/types.js";
 import { getMockSubscription } from "../lib/mock-subscriptions.js";
@@ -323,6 +325,31 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     return buildCompiledConfig(deviceProfile);
   }
 
+  async function getSubscriptionDocument(
+    token: string,
+    client: SubscriptionClientId,
+  ): Promise<SubscriptionDocument | null> {
+    const deviceProfile = await getDeviceProfileByToken(context, token);
+    if (!deviceProfile || !deviceProfile.enabled) {
+      return null;
+    }
+
+    const compiled = await buildCompiledConfig(deviceProfile);
+    if (client === "mihomo") {
+      return {
+        client,
+        content: compiled.yaml,
+        contentType: "application/yaml; charset=utf-8",
+        filename: deviceProfile.filename,
+        proxyCount: compiled.stats.proxyCount,
+        skippedCount: 0,
+        warnings: compiled.warnings,
+      };
+    }
+
+    return exportSubscriptionDocument(compiled.config, client);
+  }
+
   return {
     refreshSource,
     refreshAllSources,
@@ -330,6 +357,7 @@ export function createJobService(context: DatabaseContext, deps: JobServiceDeps 
     buildConfig,
     buildAndApplyConfig,
     getSubscriptionYaml,
+    getSubscriptionDocument,
     isRunning: () => running,
   };
 }

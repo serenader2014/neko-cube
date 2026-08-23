@@ -2,6 +2,8 @@ import type { JobRun } from "@shared/types";
 import { SETUP_SKIP_STORAGE_KEY, SETUP_STEPS } from "./constants";
 import type { SetupDashboardData, SetupStepId } from "./types";
 
+export { buildSubscriptionUrl } from "@web/lib/subscription-links";
+
 export function hasSuccessfulBuild(jobs: JobRun[]) {
   return jobs.some(
     (job) => job.status === "success" && (job.jobType === "build_config" || job.jobType === "build_and_apply_config"),
@@ -47,10 +49,6 @@ export function getSetupStepIndex(stepId: SetupStepId) {
 export function getAdjacentStepId(stepId: SetupStepId, offset: -1 | 1): SetupStepId {
   const nextIndex = Math.min(SETUP_STEPS.length - 1, Math.max(0, getSetupStepIndex(stepId) + offset));
   return SETUP_STEPS[nextIndex].id;
-}
-
-export function buildSubscriptionUrl(origin: string, token: string) {
-  return `${origin}/subscriptions/${token}/mihomo.yaml`;
 }
 
 export function summarizeSnapshot(item: { latestSnapshot: { status: string; proxyCount: number; error: string | null } | null }) {

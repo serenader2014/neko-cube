@@ -5,6 +5,7 @@ import type { ConfigFragment, DeviceProfile, DeviceProfileFragmentKey, DevicePro
 import { apiRequest, getErrorMessage } from "../lib/api";
 import { Modal } from "../components/Modal";
 import { StatusSwitch } from "../components/StatusSwitch";
+import { SubscriptionLinks } from "../components/SubscriptionLinks";
 import { pushToast } from "../components/toast";
 import { buildTextPreview } from "../lib/config-fragments";
 
@@ -116,7 +117,6 @@ export function DeviceProfilesPage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<DeviceProfile | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [copiedDeviceId, setCopiedDeviceId] = useState<number | null>(null);
   const [togglingDeviceId, setTogglingDeviceId] = useState<number | null>(null);
   const form = useForm<DeviceFormValues>({ defaultValues: emptyDevice });
 
@@ -248,8 +248,6 @@ export function DeviceProfilesPage() {
     },
   });
 
-  const baseUrl = useMemo(() => window.location.origin, []);
-
   function setFragmentOverride(key: DeviceProfileFragmentKey, nextValue: DeviceProfileFragmentOverride | null) {
     const nextOverrides = normalizeDeviceFragmentOverrides([
       ...fragmentOverrides.filter((item) => item.key !== key),
@@ -273,26 +271,13 @@ export function DeviceProfilesPage() {
     });
   }
 
-  async function copySubscriptionUrl(device: DeviceProfile) {
-    if (!device.id || !device.token || typeof navigator === "undefined" || !navigator.clipboard) {
-      return;
-    }
-
-    await navigator.clipboard.writeText(`${baseUrl}/subscriptions/${device.token}/mihomo.yaml`);
-    setCopiedDeviceId(device.id);
-    pushToast({ tone: "success", message: "订阅地址已复制。" });
-    window.setTimeout(() => {
-      setCopiedDeviceId((current) => (current === device.id ? null : current));
-    }, 1800);
-  }
-
   return (
     <section className="page">
       <article className="panel">
         <div className="section-header">
           <div>
             <h3>入口列表</h3>
-            <p className="muted">入口卡片直接展示状态、覆写摘要和订阅地址，也补上复制这个高频动作。</p>
+            <p className="muted">同一个设备 token 可生成 Mihomo、Surge 与 Quantumult X 三种原生订阅资源。</p>
           </div>
           <div className="inline-actions">
             <span className="chip">{deviceItems.length} 个入口</span>
@@ -304,7 +289,6 @@ export function DeviceProfilesPage() {
         {deviceItems.length ? (
           <div className="card-grid">
             {deviceItems.map((device) => {
-              const subscriptionUrl = `${baseUrl}/subscriptions/${device.token}/mihomo.yaml`;
               const runtimeOverrideCount = [device.mixedPort, device.allowLan, device.externalController, device.secret, device.mode].filter(
                 (value) => value !== null && value !== "" && value !== undefined,
               ).length;
@@ -351,18 +335,13 @@ export function DeviceProfilesPage() {
                     </div>
                   </div>
                   <div className="entity-card-section">
-                    <span className="section-label">订阅地址</span>
-                    <div className="compact-link-preview" title={subscriptionUrl}>
-                      {subscriptionUrl}
-                    </div>
+                    <span className="section-label">客户端订阅</span>
+                    {device.token ? <SubscriptionLinks token={device.token} /> : null}
                   </div>
                   <div className="entity-card-footer">
                     <div className="inline-actions">
                       <button className="button-secondary" onClick={() => openEditModal(device)} type="button">
                         编辑
-                      </button>
-                      <button className="button-secondary" onClick={() => copySubscriptionUrl(device)} type="button">
-                        {copiedDeviceId === device.id ? "已复制" : "复制地址"}
                       </button>
                       <button className="button-secondary" onClick={() => device.id && rotateMutation.mutate(device.id)} type="button">
                         {rotateMutation.isPending ? "轮换中..." : "轮换 token"}
@@ -456,7 +435,7 @@ export function DeviceProfilesPage() {
                   <p className="muted">
                     {editing?.id
                       ? "这里保留当前设备的实时配置预览，便于确认覆写是否生效。"
-                      : "保存后会生成一个独立 token，对应一个可直接复制的订阅地址。"}
+                      : "保存后会生成一个独立 token，并派生出各客户端可直接复制的订阅地址。"}
                   </p>
                 </div>
                 {editing?.id ? (
@@ -464,7 +443,7 @@ export function DeviceProfilesPage() {
                 ) : (
                   <div className="empty-state compact-empty-state">
                     <strong>保存后生成订阅地址</strong>
-                    <p className="muted">创建完成后，这里会出现该入口的预览配置和可复制的专属地址。</p>
+                    <p className="muted">创建完成后，这里会出现该入口的预览配置和三种客户端专属地址。</p>
                   </div>
                 )}
               </section>

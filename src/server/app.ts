@@ -7,6 +7,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import type { MihomoConnection, RuntimeEvent, RuntimeOverviewState, RuntimeSnapshot } from "../shared/telemetry.js";
+import type { SubscriptionClientId } from "../shared/subscription-clients.js";
 import {
   createCustomRule,
   createDeviceProfile,
@@ -567,18 +568,26 @@ export async function createApp(context: DatabaseContext) {
     return compiled;
   });
 
-  const sendSubscriptionYaml = async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
-    const compiled = await jobs.getSubscriptionYaml(request.params.token);
-    if (!compiled) {
-      return reply.code(404).type("text/plain; charset=utf-8").send("未找到订阅。");
-    }
+  const sendSubscription = (client: SubscriptionClientId) => {
+    return async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+      const document = await jobs.getSubscriptionDocument(request.params.token, client);
+      if (!document) {
+        return reply.code(404).type("text/plain; charset=utf-8").send("未找到订阅。");
+      }
 
-    reply.header("content-type", "application/yaml; charset=utf-8");
-    return compiled.yaml;
+      const safeFilename = document.filename.replace(/["\r\n]/g, "").replace(/[^\x20-\x7e]/g, "_");
+      reply.header("cache-control", "no-store");
+      reply.header("content-disposition", `inline; filename="${safeFilename}"`);
+      return reply.type(document.contentType).send(document.content);
+    };
   };
 
-  app.get("/subscriptions/:token/mihomo.yaml", sendSubscriptionYaml);
-  app.get("/subscriptions/:token/clash.yaml", sendSubscriptionYaml);
+  app.get("/subscriptions/:token/mihomo.yaml", sendSubscription("mihomo"));
+  app.get("/subscriptions/:token/clash.yaml", sendSubscription("mihomo"));
+  app.get("/subscriptions/:token/surge.conf", sendSubscription("surge"));
+  app.get("/subscriptions/:token/quantumult-x.conf", sendSubscription("quantumult-x"));
+  app.get("/subscriptions/:token/loon.conf", sendSubscription("loon"));
+  app.get("/subscriptions/:token/shadowrocket.txt", sendSubscription("shadowrocket"));
 
   app.get("/*", async (request, reply) => {
     const indexPath = path.join(publicDir, "index.html");

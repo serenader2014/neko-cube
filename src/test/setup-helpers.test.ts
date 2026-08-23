@@ -84,9 +84,21 @@ describe("getAdjacentStepId", () => {
 });
 
 describe("buildSubscriptionUrl", () => {
-  it("builds the mihomo subscription URL", () => {
+  it("builds client-specific subscription URLs", () => {
     expect(buildSubscriptionUrl("http://127.0.0.1:4000", "abc123")).toBe(
       "http://127.0.0.1:4000/subscriptions/abc123/mihomo.yaml",
+    );
+    expect(buildSubscriptionUrl("http://127.0.0.1:4000/", "abc123", "surge")).toBe(
+      "http://127.0.0.1:4000/subscriptions/abc123/surge.conf",
+    );
+    expect(buildSubscriptionUrl("http://127.0.0.1:4000", "abc 123", "quantumult-x")).toBe(
+      "http://127.0.0.1:4000/subscriptions/abc%20123/quantumult-x.conf",
+    );
+    expect(buildSubscriptionUrl("http://127.0.0.1:4000", "abc123", "loon")).toBe(
+      "http://127.0.0.1:4000/subscriptions/abc123/loon.conf",
+    );
+    expect(buildSubscriptionUrl("http://127.0.0.1:4000", "abc123", "shadowrocket")).toBe(
+      "http://127.0.0.1:4000/subscriptions/abc123/shadowrocket.txt",
     );
   });
 });

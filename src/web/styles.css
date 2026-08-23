@@ -1713,6 +1713,128 @@ button:disabled {
   word-break: break-word;
 }
 
+.subscription-link-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(53, 34, 22, 0.035);
+  container-type: inline-size;
+}
+
+.subscription-link-row {
+  display: grid;
+  grid-template-columns: minmax(8.75rem, 0.72fr) minmax(0, 1.5fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.62rem 0.68rem;
+}
+
+.subscription-link-row + .subscription-link-row {
+  border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.subscription-client-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.58rem;
+  min-width: 0;
+}
+
+.subscription-client-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.62rem;
+  background: color-mix(in srgb, var(--accent-soft) 54%, var(--panel));
+  color: var(--accent-strong);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.subscription-client-mark.is-surge {
+  background: rgba(62, 93, 114, 0.12);
+  color: #365d72;
+}
+
+.subscription-client-mark.is-quantumult-x {
+  background: rgba(104, 73, 123, 0.12);
+  color: #674977;
+}
+
+.subscription-client-mark.is-loon {
+  background: rgba(65, 111, 86, 0.12);
+  color: #386b51;
+}
+
+.subscription-client-mark.is-shadowrocket {
+  background: rgba(172, 80, 68, 0.12);
+  color: #a24c42;
+}
+
+.subscription-client-name {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.subscription-client-name strong,
+.subscription-client-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subscription-client-name strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.subscription-client-name small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.subscription-link-value {
+  display: block;
+  min-width: 0;
+  padding: 0.42rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  border-radius: 0.58rem;
+  background: color-mix(in srgb, var(--panel) 76%, transparent);
+  color: var(--muted);
+  font-family: "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.74rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+  user-select: all;
+  white-space: normal;
+}
+
+.subscription-link-value:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 34%, var(--panel));
+  color: var(--ink);
+}
+
+.subscription-link-value:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 56%, transparent);
+  outline-offset: 2px;
+}
+
+.subscription-copy-button {
+  min-height: 2rem;
+  padding: 0.32rem 0.62rem;
+  font-size: 0.76rem;
+}
+
 .scroll-panel {
   max-height: 28rem;
   overflow: auto;
@@ -6370,7 +6492,20 @@ button:disabled {
 
 }
 
+@container (max-width: 42rem) {
+  .subscription-link-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .subscription-link-value {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding: 0.2rem 0.12rem 0.05rem;
+  }
+}
+
 @media (max-width: 720px) {
+
   .analytics-screen,
   .analytics-view {
     gap: 0.65rem;

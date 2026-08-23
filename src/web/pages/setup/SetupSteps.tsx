@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import type { ClashTarget } from "@shared/types";
 import { pushToast } from "../../components/toast";
 import { StatusSwitch } from "../../components/StatusSwitch";
-import { buildSubscriptionUrl, summarizeSnapshot } from "./helpers";
+import { SubscriptionLinks } from "../../components/SubscriptionLinks";
+import { summarizeSnapshot } from "./helpers";
 import {
   useAddSourceMutation,
   useBuildMutation,
@@ -239,19 +240,7 @@ export function SetupLaunchStep({ dashboard, onFinish }: { dashboard: SetupDashb
   const ensureDeviceMutation = useEnsureDeviceProfileMutation();
   const compiled = applyMutation.data ?? buildMutation.data ?? null;
   const firstDevice = dashboard.deviceProfiles[0] ?? null;
-  const subscriptionUrl = useMemo(
-    () => (firstDevice?.token ? buildSubscriptionUrl(window.location.origin, firstDevice.token) : null),
-    [firstDevice?.token],
-  );
   const busy = buildMutation.isPending || applyMutation.isPending;
-
-  async function copySubscriptionUrl() {
-    if (!subscriptionUrl || typeof navigator === "undefined" || !navigator.clipboard) {
-      return;
-    }
-    await navigator.clipboard.writeText(subscriptionUrl);
-    pushToast({ tone: "success", message: "订阅地址已复制。" });
-  }
 
   return (
     <div className="setup-step-body">
@@ -294,14 +283,9 @@ export function SetupLaunchStep({ dashboard, onFinish }: { dashboard: SetupDashb
       ) : null}
 
       <div className="setup-device-block">
-        <h4>设备订阅地址</h4>
-        {subscriptionUrl ? (
-          <div className="setup-subscription-row">
-            <code className="setup-subscription-url">{subscriptionUrl}</code>
-            <button className="button-secondary" onClick={() => void copySubscriptionUrl()} type="button">
-              复制
-            </button>
-          </div>
+        <h4>客户端订阅地址</h4>
+        {firstDevice?.token ? (
+          <SubscriptionLinks token={firstDevice.token} />
         ) : (
           <div className="setup-inline-actions">
             <span className="muted">创建一个设备档案，即可获得可分发给其他设备的订阅链接。</span>
