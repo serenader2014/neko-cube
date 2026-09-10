@@ -24,6 +24,17 @@ export type ManualProxyDraft = {
   pluginSkipCertVerify: boolean;
   pluginMux: string;
   dialerProxy: string;
+  tailscaleHostname: string;
+  tailscaleAuthKey: string;
+  tailscaleControlUrl: string;
+  tailscaleStateDir: string;
+  tailscaleEphemeral: boolean;
+  tailscaleAcceptRoutes: boolean;
+  tailscaleExitNode: string;
+  tailscaleExitNodeAllowLanAccess: boolean;
+  tailscaleInterfaceName: string;
+  tailscaleRoutingMark: string;
+  tailscaleIpVersion: string;
   network: string;
   transportHost: string;
   transportPath: string;
@@ -56,6 +67,17 @@ export const emptyManualProxyDraft: ManualProxyDraft = {
   pluginSkipCertVerify: false,
   pluginMux: "",
   dialerProxy: "",
+  tailscaleHostname: "",
+  tailscaleAuthKey: "",
+  tailscaleControlUrl: "",
+  tailscaleStateDir: "",
+  tailscaleEphemeral: false,
+  tailscaleAcceptRoutes: false,
+  tailscaleExitNode: "",
+  tailscaleExitNodeAllowLanAccess: false,
+  tailscaleInterfaceName: "",
+  tailscaleRoutingMark: "",
+  tailscaleIpVersion: "",
   network: "tcp",
   transportHost: "",
   transportPath: "",
@@ -98,6 +120,20 @@ const manualProxyCoreKeys = new Set([
   "obfs-password",
 ]);
 
+const tailscaleProxyCoreKeys = new Set([
+  "hostname",
+  "auth-key",
+  "control-url",
+  "state-dir",
+  "ephemeral",
+  "accept-routes",
+  "exit-node",
+  "exit-node-allow-lan-access",
+  "interface-name",
+  "routing-mark",
+  "ip-version",
+]);
+
 export const manualProxyTypeOptions = [
   { value: "ss", label: "Shadowsocks", description: "适合常见 SS 节点，可选加密方式、UDP 和插件。" },
   { value: "trojan", label: "Trojan", description: "适合 Trojan/TLS 节点，重点配置密码、SNI 和证书校验。" },
@@ -108,6 +144,7 @@ export const manualProxyTypeOptions = [
   { value: "hysteria2", label: "Hysteria2", description: "适合低延迟链路，可配置 SNI、混淆和多端口。" },
   { value: "wireguard", label: "WireGuard", description: "基础信息先在这里维护，其它密钥和参数走高级字段。" },
   { value: "tuic", label: "TUIC", description: "支持 UUID、密码和 TLS 相关参数，其它高级参数走下方高级字段。" },
+  { value: "tailscale", label: "Tailscale", description: "作为 Tailnet 设备接入，可配置认证、子网路由和出口节点。" },
 ] as const;
 
 const manualProxyDefaultPorts: Record<string, string> = {
@@ -120,6 +157,7 @@ const manualProxyDefaultPorts: Record<string, string> = {
   hysteria2: "443",
   wireguard: "51820",
   tuic: "443",
+  tailscale: "",
 };
 
 export const ssCipherOptions = [
@@ -151,18 +189,21 @@ export const pluginModeOptions = [
 
 export const clientFingerprintOptions = ["chrome", "firefox", "safari", "ios", "android", "edge"] as const;
 
+export const tailscaleIpVersionOptions = ["dual", "ipv4", "ipv6", "ipv4-prefer", "ipv6-prefer"] as const;
+
 export function createManualProxySortId(proxy: ParsedProxy, index: number) {
   return `proxy:${index}:${String(proxy.name || "")}:${String(proxy.server || "")}:${String(proxy.port || "")}`;
 }
 
 export function createManualProxyDraft(record: ParsedProxy): ManualProxyDraft {
+  const normalizedType = stringifyKnownValue(record.type).trim().toLowerCase();
   const pluginOptions = asRecord(record["plugin-opts"]);
   const wsOptions = asRecord(record["ws-opts"]);
   const wsHeaders = asRecord(wsOptions?.headers);
   const grpcOptions = asRecord(record["grpc-opts"]);
   const httpOptions = asRecord(record["http-opts"]);
   const extraFields = Object.entries(record)
-    .filter(([key]) => !manualProxyCoreKeys.has(key))
+    .filter(([key]) => !manualProxyCoreKeys.has(key) && !(normalizedType === "tailscale" && tailscaleProxyCoreKeys.has(key)))
     .map(([key, value]) => createExtraFieldDraft(key, value));
 
   return {
@@ -182,6 +223,17 @@ export function createManualProxyDraft(record: ParsedProxy): ManualProxyDraft {
     pluginSkipCertVerify: readBooleanValue(pluginOptions?.["skip-cert-verify"]),
     pluginMux: stringifyKnownValue(pluginOptions?.mux),
     dialerProxy: stringifyKnownValue(record["dialer-proxy"]),
+    tailscaleHostname: stringifyKnownValue(record.hostname),
+    tailscaleAuthKey: stringifyKnownValue(record["auth-key"]),
+    tailscaleControlUrl: stringifyKnownValue(record["control-url"]),
+    tailscaleStateDir: stringifyKnownValue(record["state-dir"]),
+    tailscaleEphemeral: readBooleanValue(record.ephemeral),
+    tailscaleAcceptRoutes: readBooleanValue(record["accept-routes"]),
+    tailscaleExitNode: stringifyKnownValue(record["exit-node"]),
+    tailscaleExitNodeAllowLanAccess: readBooleanValue(record["exit-node-allow-lan-access"]),
+    tailscaleInterfaceName: stringifyKnownValue(record["interface-name"]),
+    tailscaleRoutingMark: stringifyKnownValue(record["routing-mark"]),
+    tailscaleIpVersion: stringifyKnownValue(record["ip-version"]),
     network: inferNetwork(record),
     transportHost: stringifyKnownValue(wsHeaders?.Host ?? getFirstArrayValue(httpOptions?.host)),
     transportPath: stringifyKnownValue(wsOptions?.path ?? getFirstArrayValue(httpOptions?.path)),
@@ -205,12 +257,41 @@ function createManualProxyRecord(draft: ManualProxyDraft): ParsedProxy {
   } as ParsedProxy;
   const normalizedType = draft.type.trim().toLowerCase();
 
-  assignIfPresent(record, "server", draft.server);
+  if (normalizedType !== "tailscale") {
+    assignIfPresent(record, "server", draft.server);
+  }
   assignIfPresent(record, "dialer-proxy", draft.dialerProxy);
 
-  if (draft.port.trim()) {
+  if (normalizedType !== "tailscale" && draft.port.trim()) {
     const parsedPort = Number(draft.port.trim());
     record.port = Number.isFinite(parsedPort) ? parsedPort : draft.port.trim();
+  }
+
+  if (normalizedType === "tailscale") {
+    assignIfPresent(record, "hostname", draft.tailscaleHostname);
+    assignIfPresent(record, "auth-key", draft.tailscaleAuthKey);
+    assignIfPresent(record, "control-url", draft.tailscaleControlUrl);
+    assignIfPresent(record, "state-dir", draft.tailscaleStateDir);
+    assignIfPresent(record, "exit-node", draft.tailscaleExitNode);
+    assignIfPresent(record, "interface-name", draft.tailscaleInterfaceName);
+    assignIfPresent(record, "ip-version", draft.tailscaleIpVersion);
+
+    if (draft.tailscaleRoutingMark.trim()) {
+      const routingMark = Number(draft.tailscaleRoutingMark.trim());
+      record["routing-mark"] = Number.isFinite(routingMark) ? routingMark : draft.tailscaleRoutingMark.trim();
+    }
+
+    if (draft.tailscaleEphemeral) {
+      record.ephemeral = true;
+    }
+
+    if (draft.tailscaleAcceptRoutes) {
+      record["accept-routes"] = true;
+    }
+
+    if (draft.tailscaleExitNodeAllowLanAccess) {
+      record["exit-node-allow-lan-access"] = true;
+    }
   }
 
   if (supportsPassword(normalizedType)) {
@@ -395,7 +476,7 @@ function supportsSkipCertVerify(type: string) {
 }
 
 function supportsUdp(type: string) {
-  return ["ss", "trojan", "socks5", "vless", "vmess", "hysteria2", "tuic"].includes(type);
+  return ["ss", "trojan", "socks5", "vless", "vmess", "hysteria2", "tuic", "tailscale"].includes(type);
 }
 
 function supportsFingerprint(type: string) {

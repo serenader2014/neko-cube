@@ -4,6 +4,7 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-ki
 import type { ParsedProxy } from "@shared/types";
 import { parseManualProxyRecords, stringifyManualProxyRecords } from "../../lib/config-fragments";
 import { SortHandle } from "../SortHandle";
+import { ManualProxyTailscaleFields } from "./ManualProxyTailscaleFields";
 import { SortableFragmentRow, useSortableInteractionSensors } from "./sortable";
 import {
   buildCommittedProxyState,
@@ -255,6 +256,7 @@ export function ManualProxiesEditor({
   const showFingerprint = ["trojan", "vless", "vmess", "tuic"].includes(currentType);
   const showUdp = ["ss", "trojan", "socks5", "vless", "vmess", "hysteria2", "tuic"].includes(currentType);
   const showHysteriaFields = currentType === "hysteria2";
+  const showTailscaleFields = currentType === "tailscale";
   const showServerName = ["trojan", "vless", "vmess", "hysteria2", "tuic"].includes(currentType);
   const showTlsToggle = ["vless", "vmess", "tuic"].includes(currentType);
 
@@ -265,7 +267,12 @@ export function ManualProxiesEditor({
       return {
         ...current,
         type: nextType,
-        port: !current.port.trim() || current.port.trim() === previousDefaultPort ? nextDefaultPort : current.port,
+        server: nextType === "tailscale" ? "" : current.server,
+        port: nextType === "tailscale"
+          ? ""
+          : !current.port.trim() || current.port.trim() === previousDefaultPort
+            ? nextDefaultPort
+            : current.port,
         cipher: nextType === "ss" && !current.cipher.trim() ? "aes-256-gcm" : current.cipher,
         network: ["vless", "vmess"].includes(nextType) ? current.network || "tcp" : current.network,
         pluginMode: current.pluginMode || "websocket",
@@ -306,14 +313,18 @@ export function ManualProxiesEditor({
               <label>节点名称</label>
               <input onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="例如 香港家宽落地" value={draft.name} />
             </div>
-            <div className="field">
-              <label>服务器地址</label>
-              <input onChange={(event) => setDraft((current) => ({ ...current, server: event.target.value }))} placeholder="例如 proxy.example.com 或 192.0.2.1" value={draft.server} />
-            </div>
-            <div className="field">
-              <label>端口</label>
-              <input inputMode="numeric" onChange={(event) => setDraft((current) => ({ ...current, port: event.target.value }))} value={draft.port} />
-            </div>
+            {!showTailscaleFields ? (
+              <>
+                <div className="field">
+                  <label>服务器地址</label>
+                  <input onChange={(event) => setDraft((current) => ({ ...current, server: event.target.value }))} placeholder="例如 proxy.example.com 或 192.0.2.1" value={draft.server} />
+                </div>
+                <div className="field">
+                  <label>端口</label>
+                  <input inputMode="numeric" onChange={(event) => setDraft((current) => ({ ...current, port: event.target.value }))} value={draft.port} />
+                </div>
+              </>
+            ) : null}
             <div className="field">
               <label>代理链</label>
               <select
@@ -332,7 +343,8 @@ export function ManualProxiesEditor({
           </div>
         </section>
 
-        <section className="editor-subsection">
+        {!showTailscaleFields ? (
+          <section className="editor-subsection">
           <div className="compact-section-header">
             <div>
               <h4>鉴权与安全</h4>
@@ -431,7 +443,15 @@ export function ManualProxiesEditor({
               ) : null}
             </div>
           ) : null}
-        </section>
+          </section>
+        ) : null}
+
+        {showTailscaleFields ? (
+          <ManualProxyTailscaleFields
+            draft={draft}
+            onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+          />
+        ) : null}
 
         {showTransport ? (
           <section className="editor-subsection">
@@ -713,8 +733,12 @@ export function ManualProxiesEditor({
                           <div className="fragment-editor-row-body">
                             <strong>{String(proxy.name || `自定义节点 ${index + 1}`)}</strong>
                             <p className="muted">
-                              {String(proxy.server || "未填写 server")}
-                              {proxy.port ? `:${String(proxy.port)}` : ""}
+                              {String(
+                                proxy.type === "tailscale"
+                                  ? proxy.hostname || proxy["control-url"] || "由 tsnet 管理连接"
+                                  : proxy.server || "未填写 server",
+                              )}
+                              {proxy.type !== "tailscale" && proxy.port ? `:${String(proxy.port)}` : ""}
                             </p>
                             <div className="token-list">
                               <span className="chip">{String(proxy.type || "unknown")}</span>
